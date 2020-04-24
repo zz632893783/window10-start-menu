@@ -40,44 +40,27 @@ export default {
                 return 100
             }
         },
-        groupIndex: {
-            type: [Number],
-            default: function () {
-                return 0
-            }
-        },
         content: {
-            type: [Number, String],
+            type: [String],
             default: function () {
                 return ''
-            }
-        },
-        // 是否缩小
-        narrow: {
-            type: [Boolean],
-            default: function () {
-                return false
             }
         }
     },
     data: function () {
         return {
-            // enable: true,
-            mousedownEnable: false,
             x: 0,
-            y: 0,
-            transitionDuring: 0.3,
-            transitionEnable: true
+            y: 0
         }
     },
     methods: {
         // setPosition: function () {},
-        setCol: function (col) {
-            this.col = col
-        },
-        setRow: function (row) {
-            this.row = row
-        },
+        // setCol: function (col) {
+        //     this.col = col
+        // },
+        // setRow: function (row) {
+        //     this.row = row
+        // },
         // setEnable: function (enable) {
         //     this.enable = enable
         // },
@@ -114,24 +97,34 @@ export default {
                 style.lineHeight = `${this.unitSize * 2}px`
                 style.fontSize = `${this.unitSize * 2 / 2}px`
             }
-            if (this.narrow) {
-                style.transform = `scale(${0.9})`
-                style.opacity = 0.75
-            }
+            // if (this.narrow) {
+            //     style.transform = `scale(${0.9})`
+            //     style.opacity = 0.75
+            // }
+            // if ((this.$parent.activeBlockId === this.blockId) && this.blockId) {
+            //     // console.log(123123)
+            //     // this.x = this.col * this.unitSize
+            //     // this.y = (this.row + this.groupIndex + 1) * this.unitSize
+            //     style.left = `${this.x}px`
+            //     style.top = `${this.y}px`
+            //     // style.transition = 'none'
+            // } else {
+            //     style.left = `${this.col * this.unitSize}px`
+            //     style.top = `${(this.row + this.groupIndex + 1) * this.unitSize}px`
+            //     // const transitionTime = 0.3
+            //     // style.transition = `transform ${transitionTime}s, top ${transitionTime}s, left ${transitionTime}s`
+            // }
+            // style.transition = this.transitionEnable ? `all ${this.transitionDuring}s` : 'none'
             if ((this.$parent.activeBlockId === this.blockId) && this.blockId) {
-                // console.log(123123)
-                // this.x = this.col * this.unitSize
-                // this.y = (this.row + this.groupIndex + 1) * this.unitSize
                 style.left = `${this.x}px`
                 style.top = `${this.y}px`
-                // style.transition = 'none'
+                style.transition = 'none'
             } else {
                 style.left = `${this.col * this.unitSize}px`
-                style.top = `${(this.row + this.groupIndex + 1) * this.unitSize}px`
-                // const transitionTime = 0.3
-                // style.transition = `transform ${transitionTime}s, top ${transitionTime}s, left ${transitionTime}s`
+                style.top = `${(this.row) * this.unitSize}px`
+                const transitionTime = 0.3
+                style.transition = `transform ${transitionTime}s, top ${transitionTime}s, left ${transitionTime}s`
             }
-            style.transition = this.transitionEnable ? `all ${this.transitionDuring}s` : 'none'
             return style
         },
         mousedownFunc: function (event) {
@@ -139,8 +132,8 @@ export default {
             this.$emit('setDragEnable', true)
             this.$emit('setDragData', event)
             this.x = this.col * this.unitSize
-            this.y = (this.row + this.groupIndex + 1) * this.unitSize
-            this.transitionEnable = false
+            this.y = this.row * this.unitSize
+            // this.transitionEnable = false
         },
         mouseupFunc: function () {
             this.$emit('setActiveBlockId', null)
@@ -150,6 +143,51 @@ export default {
         setPosition: function (x, y) {
             this.x = x
             this.y = y
+            // this.compute
+        },
+        computeCol: function () {
+            const col = Math.round(this.x / this.unitSize)
+            if (col !== this.col) {
+                this.$emit('setCol', {
+                    id: this.blockId,
+                    col
+                })
+                // if (col > this.col) {
+                //     const moveLine = {
+                //         rowStart: this.row,
+                //         rowEnd: this.row + ({
+                //             mini: 1,
+                //             small: 2,
+                //             medium: 2,
+                //             large: 4
+                //         })[this.size],
+                //         col: this.col + ({
+                //             mini: 1,
+                //             small: 2,
+                //             medium: 4,
+                //             large: 4
+                //         })[this.size]
+                //     }
+                //     this.$emit('moveOtherBlock', moveLine)
+                // }
+            }
+        },
+        computeRow: function () {
+            const row = Math.round(this.y / this.unitSize)
+            if (row !== this.row) {
+                this.$emit('setRow', {
+                    id: this.blockId,
+                    row
+                })
+            }
+        }
+    },
+    watch: {
+        x: function (newVal) {
+            this.computeCol()
+        },
+        y: function (newVal) {
+            this.computeRow()
         }
     }
 }
@@ -159,5 +197,6 @@ export default {
     border: 1px solid red;
     position: absolute;
     text-align: center;
+    user-select: none;
 }
 </style>
