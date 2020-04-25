@@ -6,17 +6,17 @@
                     <input v-model="groupItem.groupName"  v-on:mousedown.stop />
                 </div>
                 <div class="panelBody" v-bind:style="computePanelBodyStyle(groupItem)">
-                    <div class="block" v-for="(item, index) in groupItem.blocks" v-bind:key="index" v-bind:style="computeBlockStyle(item)" v-on:click="selectBlock(groupItem, item)" v-on:mousedown.stop="blockMousedown(item)">
+                    <div class="block" v-for="(item, index) in groupItem.blocks" v-bind:key="index" v-bind:style="computeBlockStyle(item)" v-on:click="selectBlock(groupItem, item)" v-on:mousedown.stop="blockMousedown(groupItem, item, $event)">
                         {{item.id}}
                     </div>
                 </div>
             </div>
         </template>
         <div class="btns">
-            <button v-on:click="testFunc('top')">↑</button>
-            <button v-on:click="testFunc('right')">→</button>
-            <button v-on:click="testFunc('bottom')">↓</button>
-            <button v-on:click="testFunc('left')">←</button>
+            <button v-on:click="moveFunc('top')">↑</button>
+            <button v-on:click="moveFunc('right')">→</button>
+            <button v-on:click="moveFunc('bottom')">↓</button>
+            <button v-on:click="moveFunc('left')">←</button>
         </div>
     </div>
 </template>
@@ -201,12 +201,16 @@ export default {
                 }]
             }],
             unitSize: 40,
-            headerHeight: 25,
+            headerHeight: 30,
             mouseData: {
                 clientX: 0,
                 clientY: 0,
                 offsetX: 0,
-                offsetY: 0
+                offsetY: 0,
+                prevClientX: 0,
+                prevClientY: 0,
+                blockX: 0,
+                blockY: 0
             },
             dragBlock: null,
             dragGroup: null
@@ -227,6 +231,9 @@ export default {
                     max = max < temp ? temp : max
                 }
                 groupItem.rowsCount = max
+                groupItem.blocks.forEach(block => {
+                    block.backgroundColor = ['rgb(242, 80, 34)', 'rgb(127, 168, 0)', 'rgb(0, 164, 239)', 'rgb(255, 185, 0)'][parseInt(Math.random() * 4)]
+                })
             })
         },
         computePanelBodyStyle: function (groupItem) {
@@ -238,12 +245,15 @@ export default {
             let left = 0
             let top = 0
             let transition = ''
+            let zIndex
             if (this.activeGroup === groupItem) {
                 left = this.mouseData.clientX - this.mouseData.offsetX
                 top = this.mouseData.clientY - this.mouseData.offsetY
                 transition = 'none'
+                zIndex = 1
             } else {
                 left = 0
+                zIndex = 0
                 for (let i = 0; i < this.menu.length; i++) {
                     if (Number(this.menu[i].id) < Number(groupItem.id)) {
                         if (this.activeGroup === this.menu[i]) {
@@ -260,33 +270,87 @@ export default {
                 height: `${this.headerHeight}px`,
                 top: `${top}px`,
                 left: `${left}px`,
-                transition
+                transition,
+                zIndex
             }
         },
         computeBlockStyle: function (block) {
+            let left
+            let top
+            let transition
+            let transform
+            let opacity
+            if (this.activeBlock === block) {
+                left = this.mouseData.blockX
+                top = this.mouseData.blockY
+                transition = 'none'
+                transform = ''
+                opacity = 1
+            } else {
+                left = block.col * this.unitSize
+                top = block.row * this.unitSize
+                transition = `${this.transitionDuring}s`
+                transform = 'scale(0.9)'
+                opacity = 0.8
+            }
+            if (!this.activeBlock) {
+                transform = ''
+                opacity = 1
+            }
             return {
                 width: `${block.width * this.unitSize}px`,
                 height: `${block.height * this.unitSize}px`,
-                left: `${block.col * this.unitSize}px`,
-                top: `${block.row * this.unitSize}px`,
-                border: `1px solid ${this.dragBlock === block ? 'red' : 'black'}`
+                left: `${left}px`,
+                top: `${top}px`,
+                // border: `1px solid ${this.dragBlock === block ? 'red' : 'black'}`,
+                transition,
+                transform,
+                opacity,
+                backgroundColor: block.backgroundColor,
+                lineHeight: `${block.height * this.unitSize}px`,
+                fontSize: `${block.height * this.unitSize / 3}px`
             }
         },
         groupMousedown: function (groupItem, event) {
             this.activeGroup = groupItem
             this.mouseData.clientX = event.clientX
             this.mouseData.clientY = event.clientY
+            // this.mouseData.prevClientX = event.clientX
+            // this.mouseData.prevClientY = event.clientY
             this.mouseData.offsetX = event.offsetX
             this.mouseData.offsetY = event.offsetY
         },
         pageMouseup: function () {
             this.activeGroup = null
+            this.activeBlock = null
         },
         pageMousemove: function (event) {
             if (this.activeGroup) {
                 this.mouseData.clientX = event.clientX
                 this.mouseData.clientY = event.clientY
                 this.computeGroupIndex()
+            }
+            if (this.activeBlock) {
+                this.mouseData.blockX = this.mouseData.blockX + (event.clientX - this.mouseData.clientX)
+                this.mouseData.blockY = this.mouseData.blockY + (event.clientY - this.mouseData.clientY)
+                this.mouseData.clientX = event.clientX
+                this.mouseData.clientY = event.clientY
+                const newCol = Math.round(this.mouseData.blockX / this.unitSize)
+                const newRow = Math.round(this.mouseData.blockY / this.unitSize)
+                if (newCol > this.activeBlock.col) {
+                    this.moveFunc('right')
+                    this.computeGroupRowsCount()
+                } else if (newCol < this.activeBlock.col) {
+                    this.moveFunc('left')
+                    this.computeGroupRowsCount()
+                } else if (newRow > this.activeBlock.row) {
+                    this.moveFunc('bottom')
+                    this.computeGroupRowsCount()
+                } else if (newRow < this.activeBlock.row) {
+                    this.moveFunc('top')
+                    this.computeGroupRowsCount()
+                }
+                // let newRow = Math.round(this.mouseData.blockY / this.unitSize)
             }
         },
         computeGroupIndex: function () {
@@ -362,58 +426,60 @@ export default {
                 } else {
                     console.log('位置不足，自动计算位置')
                     /* eslint-disable */
-                    // switch (direction) {
-                    // case 'right':
-                    //     let left = tempArr[0].col
-                    //     let top = tempArr[0].row
-                    //     let right = left + tempArr[0].width
-                    //     let bottom = top + tempArr[0].height
-                    //     tempArr.forEach(block => {
-                    //         const tempLeft = block.col
-                    //         const tempTop = block.row
-                    //         const tempRight = tempLeft + block.width
-                    //         const tempBottom = tempTop + block.height
-                    //         if (tempLeft < left) {
-                    //             left = tempLeft
-                    //         }
-                    //         if (tempTop < top) {
-                    //             top = tempTop
-                    //         }
-                    //         if (tempRight > right) {
-                    //             right = tempRight
-                    //         }
-                    //         if (tempBottom > bottom) {
-                    //             bottom = tempBottom
-                    //         }
-                    //     })
-                    //     this.linePush(group, 'right', right, undefined, top, bottom)
-                    //     tempArr.forEach(item => {
-                    //         switch (direction) {
-                    //         case 'right':
-                    //             item.col = item.col + 1
-                    //             break
-                    //         // case 'bottom':
-                    //         //     item.row = item.row + 1
-                    //         //     break
-                    //         // case 'left':
-                    //         //     item.col = item.col - 1
-                    //         //     break
-                    //         // case 'top':
-                    //         //     item.row = item.row - 1
-                    //         //     break
-                    //         }
-                    //     })
+                    let left = tempArr[0].col
+                    let top = tempArr[0].row
+                    let right = left + tempArr[0].width
+                    let bottom = top + tempArr[0].height
+                    tempArr.forEach(block => {
+                        const tempLeft = block.col
+                        const tempTop = block.row
+                        const tempRight = tempLeft + block.width
+                        const tempBottom = tempTop + block.height
+                        if (tempLeft < left) {
+                            left = tempLeft
+                        }
+                        if (tempTop < top) {
+                            top = tempTop
+                        }
+                        if (tempRight > right) {
+                            right = tempRight
+                        }
+                        if (tempBottom > bottom) {
+                            bottom = tempBottom
+                        }
+                    })
+                    switch (direction) {
+                    case 'right':
+                        tempArr.forEach(block => {
+                            block.row = block.row + (end - top)
+                        })
+                        group.blocks.forEach(block => {
+                            if (block.row >= end && tempArr.indexOf(block) < 0) {
+                                block.row = block.row + (end - top)
+                            }
+                        })
+                        break
+                    case 'bottom':
+                        group.blocks.forEach(block => {
+                            if (block.row >= row) {
+                                block.row = block.row + 1
+                            }
+                        })
+                        break
+                    case 'left':
+                        tempArr.forEach(block => {
+                            block.row = block.row + (end - top)
+                        })
+                        group.blocks.forEach(block => {
+                            if (block.row >= end && tempArr.indexOf(block) < 0) {
+                                block.row = block.row + (end - top)
+                            }
+                        })
+                        break
+                    // case 'top':
+                    //     item.row = item.row - 1
                     //     break
-                    // // case 'bottom':
-                    // //     item.row = item.row + 1
-                    // //     break
-                    // // case 'left':
-                    // //     item.col = item.col - 1
-                    // //     break
-                    // // case 'top':
-                    // //     item.row = item.row - 1
-                    // //     break
-                    // }
+                    }
                 }
             }
         },
@@ -493,18 +559,22 @@ export default {
                 return true
             }
         },
-        testFunc: function (direction) {
+        moveFunc: function (direction) {
             switch (direction) {
             case 'right':
+                this.linePush(this.dragGroup, direction, this.dragBlock.col + this.dragBlock.width, undefined, this.dragBlock.row, this.dragBlock.row + this.dragBlock.height)
                 this.linePush(this.dragGroup, direction, this.dragBlock.col, undefined, this.dragBlock.row, this.dragBlock.row + this.dragBlock.height)
                 break
             case 'bottom':
+                this.linePush(this.dragGroup, direction, undefined, this.dragBlock.row + this.dragBlock.height, this.dragBlock.col, this.dragBlock.col + this.dragBlock.width)
                 this.linePush(this.dragGroup, direction, undefined, this.dragBlock.row, this.dragBlock.col, this.dragBlock.col + this.dragBlock.width)
                 break
             case 'left':
+                this.linePush(this.dragGroup, direction, this.dragBlock.col, undefined, this.dragBlock.row, this.dragBlock.row + this.dragBlock.height)
                 this.linePush(this.dragGroup, direction, this.dragBlock.col + this.dragBlock.width, undefined, this.dragBlock.row, this.dragBlock.row + this.dragBlock.height)
                 break
             case 'top':
+                this.linePush(this.dragGroup, direction, undefined, this.dragBlock.row, this.dragBlock.col, this.dragBlock.col + this.dragBlock.width)
                 this.linePush(this.dragGroup, direction, undefined, this.dragBlock.row + this.dragBlock.height, this.dragBlock.col, this.dragBlock.col + this.dragBlock.width)
                 break
             }
@@ -512,11 +582,27 @@ export default {
             // this.linePush(this.dragGroup, 'bottom', undefined, 0, 8, 9)
         },
         selectBlock: function (groupItem, block) {
+            // this.dragBlock = block
+            // this.dragGroup = groupItem
+        },
+        blockMousedown: function (groupItem, block, event) {
+            this.activeBlock = block
             this.dragBlock = block
             this.dragGroup = groupItem
-        },
-        blockMousedown: function (block) {
-            this.activeBlock = block
+            // this.mouseData.prevClientX = event.clientX
+            // this.mouseData.prevClientY = event.clientY
+            this.mouseData.clientX = event.clientX
+            this.mouseData.clientY = event.clientY
+            this.mouseData.offsetX = event.offsetX
+            this.mouseData.offsetY = event.offsetY
+            let sum = 0
+            const temp = this.menu.filter(item => Number(item.id) < Number(groupItem.id))
+            temp.forEach(item => {
+                sum = sum + this.headerHeight + item.rowsCount * this.unitSize
+            })
+            sum = sum + this.headerHeight
+            this.mouseData.blockY = event.clientY - sum - event.offsetY
+            this.mouseData.blockX = block.col * this.unitSize
         }
     },
     mounted: function () {
@@ -532,7 +618,8 @@ export default {
     width: 600px;
     // height: 800px;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.1);
+    // background-color: rgba(0, 0, 0, 0.1);
+    background-color: rgb(59, 59, 59);
     position: relative;
     .group {
         position: absolute;
@@ -551,8 +638,9 @@ export default {
             overflow: hidden;
             .block {
                 position: absolute;
-                border: 1px solid;
-                transition: 0.2s;
+                border: 1px solid white;
+                text-align: center;
+                // transition: 0.2s;
             }
         }
     }
