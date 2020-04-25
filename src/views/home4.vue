@@ -3,11 +3,11 @@
         <template v-if="ready">
             <div class="group" v-for="(groupItem, groupIndex) in menu" v-bind:key="groupIndex" v-bind:style="computeGroupStyle(groupItem)">
                 <div class="panelHeader" v-bind:style="`height: ${headerHeight}px;`" v-on:mousedown.stop="groupMousedown(groupItem, $event)">
-                    <input v-model="groupItem.groupName"  v-on:mousedown.stop />
+                    <input v-model="groupItem.groupName" v-on:mousedown.stop v-bind:style="computeInputStyle(groupItem)"/>
                 </div>
                 <div class="panelBody" v-bind:style="computePanelBodyStyle(groupItem)">
                     <div class="block" v-for="(item, index) in groupItem.blocks" v-bind:key="index" v-bind:style="computeBlockStyle(item)" v-on:click="selectBlock(groupItem, item)" v-on:mousedown.stop="blockMousedown(groupItem, item, $event)">
-                        {{item.id}}
+                        <span v-bind:style="`position: absolute; top: ${gap}px; right: ${gap}px; bottom: ${gap}px; left: ${gap}px; background-color: ${item.backgroundColor};`">{{item.id}}</span>
                     </div>
                 </div>
             </div>
@@ -28,6 +28,7 @@ export default {
             ready: false,
             activeGroup: null,
             activeBlock: null,
+            focusHeaderInput: false,
             menu: [{
                 id: '0',
                 blocks: [{
@@ -213,7 +214,10 @@ export default {
                 blockY: 0
             },
             dragBlock: null,
-            dragGroup: null
+            dragGroup: null,
+            gap: 2,
+            moveScale: 0.95,
+            moveOpacity: 0.6
             // dragLine: {
             //     top: 0,
             //     right: 0,
@@ -223,6 +227,13 @@ export default {
         }
     },
     methods: {
+        computeInputStyle: function (groupItem) {
+            // console.log(groupItem, this.activeGroup)
+            return {
+                lineHeight: `${this.headerHeight}px`
+            }
+            // focusHeaderInput
+        },
         computeGroupRowsCount: function () {
             this.menu.forEach(groupItem => {
                 let max = 1
@@ -231,6 +242,10 @@ export default {
                     max = max < temp ? temp : max
                 }
                 groupItem.rowsCount = max
+            })
+        },
+        computeGroupBlockColor: function () {
+            this.menu.forEach(groupItem => {
                 groupItem.blocks.forEach(block => {
                     block.backgroundColor = ['rgb(242, 80, 34)', 'rgb(127, 168, 0)', 'rgb(0, 164, 239)', 'rgb(255, 185, 0)'][parseInt(Math.random() * 4)]
                 })
@@ -280,18 +295,20 @@ export default {
             let transition
             let transform
             let opacity
+            let zIndex
             if (this.activeBlock === block) {
                 left = this.mouseData.blockX
                 top = this.mouseData.blockY
                 transition = 'none'
                 transform = ''
                 opacity = 1
+                zIndex = 1
             } else {
                 left = block.col * this.unitSize
                 top = block.row * this.unitSize
                 transition = `${this.transitionDuring}s`
-                transform = 'scale(0.9)'
-                opacity = 0.8
+                transform = `scale(${this.moveScale})`
+                opacity = this.moveOpacity
             }
             if (!this.activeBlock) {
                 transform = ''
@@ -306,9 +323,11 @@ export default {
                 transition,
                 transform,
                 opacity,
-                backgroundColor: block.backgroundColor,
+                // backgroundColor: block.backgroundColor,
                 lineHeight: `${block.height * this.unitSize}px`,
-                fontSize: `${block.height * this.unitSize / 3}px`
+                fontSize: `${block.height * this.unitSize / 3}px`,
+                padding: `${this.gap}px`,
+                zIndex
             }
         },
         groupMousedown: function (groupItem, event) {
@@ -323,6 +342,7 @@ export default {
         pageMouseup: function () {
             this.activeGroup = null
             this.activeBlock = null
+            this.checkEmptyRow()
         },
         pageMousemove: function (event) {
             if (this.activeGroup) {
@@ -404,7 +424,7 @@ export default {
                     }
                 })
             }
-            console.log(tempArr)
+            // console.log(tempArr)
             if (tempArr.length) {
                 if (this.checkBlockMoveEnable(direction, group, tempArr)) {
                     tempArr.forEach(item => {
@@ -603,10 +623,44 @@ export default {
             sum = sum + this.headerHeight
             this.mouseData.blockY = event.clientY - sum - event.offsetY
             this.mouseData.blockX = block.col * this.unitSize
+        },
+        checkEmptyRow: function () {
+            console.log('拖动结束之后，去除空余位置')
+            // this.menu.forEach(groupItem => {
+            //     let moveBlocks = []
+            //     let lastCheckRow = [...groupItem.blocks].sort((x, y) => {
+            //         return (y.row + y.height) - (x.row + x.height)
+            //     })[0]
+            //     // console.log('lastCheckRow', lastCheckRow)
+            //     for (let i = 0; i < lastCheckRow.row - 1; i++) {
+            //         let isEmpty = true
+            //         groupItem.blocks.forEach((item, index) => {
+            //             if (item.row === i) {
+            //                 isEmpty = false
+            //                 // moveBlocks.push(item)
+            //             } else if (item.row + item.height < i && item.row >= i) {
+            //                 isEmpty = false
+            //                 // moveBlocks.push(item)
+            //             }
+            //         })
+            //         if (isEmpty) {
+            //             moveBlocks = [...moveBlocks, ...groupItem.blocks.filter(block => block.row >= i + 1)]
+            //             // groupItem.blocks.filter(block => block.row >= i + 1).forEach(block => {
+            //             //     block.row = block.row - 1
+            //             // })
+            //             // i = i - 1
+            //             // groupItem.rowsCount = groupItem.rowsCount - 1
+            //         }
+            //     }
+            //     moveBlocks.forEach(block => {
+            //         block.row = block.row - 1
+            //     })
+            // })
         }
     },
     mounted: function () {
         this.computeGroupRowsCount()
+        this.computeGroupBlockColor()
         setTimeout(() => {
             this.ready = true
         }, 100)
@@ -615,7 +669,7 @@ export default {
 </script>
 <style lang="stylus" scoped>
 .home4 {
-    width: 600px;
+    // width: 600px;
     // height: 800px;
     height: 100%;
     // background-color: rgba(0, 0, 0, 0.1);
@@ -626,9 +680,18 @@ export default {
         width: 100%;
         transition: 0.2s;
         user-select: none;
+        width: 600px;
         .panelHeader {
             border: 1px solid;
             width: 100%;
+            input {
+                background-color: transparent;
+                border: none;
+                transition: 0.2s;
+                &:focus {
+                    background-color: rgba(255, 255, 255, 0.5);
+                }
+            }
         }
         .panelBody {
             border: 1px solid;
@@ -638,7 +701,7 @@ export default {
             overflow: hidden;
             .block {
                 position: absolute;
-                border: 1px solid white;
+                // border: 4px solid white;
                 text-align: center;
                 // transition: 0.2s;
             }
